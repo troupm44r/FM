@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import random
 import os
-from utils.database import (
+from .utils.database import (
     load_data, save_data, get_equipes, get_joueurs_by_equipe,
     get_championnats, get_classement, update_classement,
     get_calendrier, update_match, get_tactiques,
@@ -11,8 +11,8 @@ from utils.database import (
     add_utilisateur, get_offres_transfert, add_offre_transfert,
     update_transfert, get_ligue_des_champions, get_matchs_ldc
 )
-from utils.simulation import simuler_match
-from utils.transferts import generer_offres_ia, traiter_offre
+from .utils.simulation import simuler_match
+from .utils.transferts import generer_offres_ia, traiter_offre
 
 # --- Configuration de la page ---
 st.set_page_config(
