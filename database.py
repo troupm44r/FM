@@ -1,150 +1,134 @@
-import sqlite3
-import hashlib
 import os
+import pandas as pd
+import hashlib
 
-DB_NAME = "football_manager.db"
+DATA_DIR = "data"
+
+# Noms des fichiers Excel par table
+USERS_FILE = os.path.join(DATA_DIR, "users.xlsx")
+SAVES_FILE = os.path.join(DATA_DIR, "saves.xlsx")
+LEAGUES_FILE = os.path.join(DATA_DIR, "leagues.xlsx")
+TEAMS_FILE = os.path.join(DATA_DIR, "teams.xlsx")
+PLAYERS_FILE = os.path.join(DATA_DIR, "players.xlsx")
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    
-    # Table des utilisateurs
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            password TEXT
-        )
-    ''')
-    
-    # Table des sauvegardes de parties
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS saves (
-            username TEXT PRIMARY KEY,
-            team_name TEXT,
-            budget INTEGER,
-            points INTEGER,
-            played INTEGER,
-            goal_difference INTEGER,
-            FOREIGN KEY (username) REFERENCES users (username)
-        )
-    ''')
-    
-    # Tables du jeu (Ligues, Équipes, Joueurs)
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS leagues (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE
-        )
-    ''')
-    
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS teams (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            league_id INTEGER,
-            FOREIGN KEY(league_id) REFERENCES leagues(id)
-        )
-    ''')
-    
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS players (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            team_id INTEGER,
-            position TEXT,
-            rating INTEGER,
-            FOREIGN KEY(team_id) REFERENCES teams(id)
-        )
-    ''')
-    
-    conn.commit()
-    
-    # Remplir des données par défaut si la base est vide (Ligues majeures et exemples d'équipes/joueurs)
-    c.execute("SELECT COUNT(*) FROM leagues")
-    if c.fetchone()[0] == 0:
-        ligues = ["Ligue 1", "Premier League", "Liga", "Serie A", "Bundesliga"]
-        for ligue in ligues:
-            c.execute("INSERT INTO leagues (name) VALUES (?)", (ligue,))
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
         
-        conn.commit()
+    # 1. users.xlsx
+    if not os.path.exists(USERS_FILE):
+        df_users = pd.DataFrame(columns=["username", "password"])
+        df_users.to_excel(USERS_FILE, index=False)
         
-        # Données de test / exemples pour alimenter les ligues
-        donnees_initiales = [
-            ("Ligue 1", "Paris Saint-Germain", [("Kylian Mbappé-like", "Attaquant", 91), ("Ousmane Dembélé", "Attaquant", 84), ("Marquinhos", "Défenseur", 85)]),
-            ("Ligue 1", "Olympique de Marseille", [("Pierre-Emerick Aubameyang", "Attaquant", 82), ("Valentin Rongier", "Milieu", 79), ("Chancel Mbemba", "Défenseur", 81)]),
-            ("Premier League", "Manchester City", [("Erling Haaland", "Attaquant", 91), ("Kevin De Bruyne", "Milieu", 91), ("Rodri", "Milieu", 89)]),
-            ("Premier League", "Arsenal", [("Bukayo Saka", "Attaquant", 86), ("Martin Ødegaard", "Milieu", 87), ("William Saliba", "Défenseur", 85)]),
-            ("Liga", "Real Madrid", [("Jude Bellingham", "Milieu", 89), ("Vinicius Jr", "Attaquant", 89), ("Thibaut Courtois", "Gardien", 90)]),
-            ("Liga", "FC Barcelone", [("Robert Lewandowski", "Attaquant", 88), ("Pedri", "Milieu", 86), ("Frenkie de Jong", "Milieu", 87)]),
-            ("Serie A", "Inter Milan", [("Lautaro Martínez", "Attaquant", 88), ("Nicolò Barella", "Milieu", 86), ("Benjamin Pavard", "Défenseur", 84)]),
-            ("Serie A", "AC Milan", [("Rafael Leão", "Attaquant", 86), ("Theo Hernández", "Défenseur", 85), ("Mike Maignan", "Gardien", 87)]),
-            ("Bundesliga", "Bayern Munich", [("Harry Kane", "Attaquant", 90), ("Jamal Musiala", "Milieu", 86), ("Manuel Neuer", "Gardien", 87)]),
-            ("Bundesliga", "Bayer Leverkusen", [("Florian Wirtz", "Milieu", 85), ("Victor Boniface", "Attaquant", 82), ("Granit Xhaka", "Milieu", 83)])
-        ]
+    # 2. saves.xlsx
+    if not os.path.exists(SAVES_FILE):
+        df_saves = pd.DataFrame(columns=["username", "team_name", "budget", "points", "played", "goal_difference"])
+        df_saves.to_excel(SAVES_FILE, index=False)
         
-        for ligue_nom, equipe_nom, joueurs in donnees_initiales:
-            c.execute("SELECT id FROM leagues WHERE name = ?", (ligue_nom,))
-            l_id = c.fetchone()[0]
-            c.execute("INSERT INTO teams (name, league_id) VALUES (?, ?)", (equipe_nom, l_id))
-            t_id = c.lastrowid
-            for p_nom, p_pos, p_note in joueurs:
-                c.execute("INSERT INTO players (name, team_id, position, rating) VALUES (?, ?, ?, ?)", (p_nom, t_id, p_pos, p_note))
-                
-        conn.commit()
+    # 3. leagues.xlsx
+    if not os.path.exists(LEAGUES_FILE):
+        df_leagues = pd.DataFrame({
+            "id": [1, 2, 3, 4, 5],
+            "name": ["Ligue 1", "Premier League", "Liga", "Serie A", "Bundesliga"]
+        })
+        df_leagues.to_excel(LEAGUES_FILE, index=False)
         
-    conn.close()
+    # 4. teams.xlsx
+    if not os.path.exists(TEAMS_FILE):
+        df_teams = pd.DataFrame({
+            "id": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            "name": [
+                "Paris Saint-Germain", "Olympique de Marseille", 
+                "Manchester City", "Arsenal", 
+                "Real Madrid", "FC Barcelone", 
+                "Inter Milan", "AC Milan", 
+                "Bayern Munich", "Bayer Leverkusen"
+            ],
+            "league_id": [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]
+        })
+        df_teams.to_excel(TEAMS_FILE, index=False)
+        
+    # 5. players.xlsx
+    if not os.path.exists(PLAYERS_FILE):
+        df_players = pd.DataFrame({
+            "id": list(range(1, 31)),
+            "name": [
+                "Kylian Mbappé-like", "Ousmane Dembélé", "Marquinhos",
+                "Pierre-Emerick Aubameyang", "Valentin Rongier", "Chancel Mbemba",
+                "Erling Haaland", "Kevin De Bruyne", "Rodri",
+                "Bukayo Saka", "Martin Ødegaard", "William Saliba",
+                "Jude Bellingham", "Vinicius Jr", "Thibaut Courtois",
+                "Robert Lewandowski", "Pedri", "Frenkie de Jong",
+                "Lautaro Martínez", "Nicolò Barella", "Benjamin Pavard",
+                "Rafael Leão", "Theo Hernández", "Mike Maignan",
+                "Harry Kane", "Jamal Musiala", "Manuel Neuer",
+                "Florian Wirtz", "Victor Boniface", "Granit Xhaka"
+            ],
+            "team_id": [
+                1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 
+                6, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10, 10, 10
+            ],
+            "position": [
+                "Attaquant", "Attaquant", "Défenseur", "Attaquant", "Milieu", "Défenseur",
+                "Attaquant", "Milieu", "Milieu", "Attaquant", "Milieu", "Défenseur",
+                "Milieu", "Attaquant", "Gardien", "Attaquant", "Milieu", "Milieu",
+                "Attaquant", "Milieu", "Défenseur", "Attaquant", "Défenseur", "Gardien",
+                "Attaquant", "Milieu", "Gardien", "Milieu", "Attaquant", "Milieu"
+            ],
+            "rating": [
+                91, 84, 85, 82, 79, 81, 91, 91, 89, 86, 87, 85, 
+                89, 89, 90, 88, 86, 87, 88, 86, 84, 86, 85, 87, 
+                90, 86, 87, 85, 82, 83
+            ]
+        })
+        df_players.to_excel(PLAYERS_FILE, index=False)
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def register_user(username, password):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    try:
-        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", 
-                  (username, hash_password(password)))
-        c.execute("INSERT INTO saves (username, team_name, budget, points, played, goal_difference) VALUES (?, ?, ?, ?, ?, ?)",
-                  (username, f"FC {username}", 50000000, 0, 0, 0))
-        conn.commit()
-        success = True
-    except sqlite3.IntegrityError:
-        success = False
-    conn.close()
-    return success
+    df_users = pd.read_excel(USERS_FILE)
+    if username in df_users["username"].values:
+        return False
+    
+    # Ajouter l'utilisateur
+    new_user = pd.DataFrame([[username, hash_password(password)]], columns=["username", "password"])
+    df_users = pd.concat([df_users, new_user], ignore_index=True)
+    df_users.to_excel(USERS_FILE, index=False)
+    
+    # Créer sa sauvegarde initiale
+    df_saves = pd.read_excel(SAVES_FILE)
+    new_save = pd.DataFrame([[username, f"FC {username}", 50000000, 0, 0, 0]], 
+                            columns=["username", "team_name", "budget", "points", "played", "goal_difference"])
+    df_saves = pd.concat([df_saves, new_save], ignore_index=True)
+    df_saves.to_excel(SAVES_FILE, index=False)
+    
+    return True
 
 def verify_user(username, password):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT password FROM users WHERE username = ?", (username,))
-    row = c.fetchone()
-    conn.close()
-    if row and row[0] == hash_password(password):
-        return True
+    df_users = pd.read_excel(USERS_FILE)
+    user_row = df_users[df_users["username"] == username]
+    if not user_row.empty:
+        if user_row.iloc[0]["password"] == hash_password(password):
+            return True
     return False
 
 def load_game_state(username):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT team_name, budget, points, played, goal_difference FROM saves WHERE username = ?", (username,))
-    row = c.fetchone()
-    conn.close()
-    if row:
+    df_saves = pd.read_excel(SAVES_FILE)
+    save_row = df_saves[df_saves["username"] == username]
+    if not save_row.empty:
         return {
-            "team_name": row[0],
-            "budget": row[1],
-            "points": row[2],
-            "played": row[3],
-            "goal_difference": row[4]
+            "team_name": save_row.iloc[0]["team_name"],
+            "budget": int(save_row.iloc[0]["budget"]),
+            "points": int(save_row.iloc[0]["points"]),
+            "played": int(save_row.iloc[0]["played"]),
+            "goal_difference": int(save_row.iloc[0]["goal_difference"])
         }
     return None
 
 def save_game_state(username, state):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute('''
-        UPDATE saves 
-        SET team_name = ?, budget = ?, points = ?, played = ?, goal_difference = ?
-        WHERE username = ?
-    ''', (state["team_name"], state["budget"], state["points"], state["played"], state["goal_difference"], username))
-    conn.commit()
-    conn.close()
+    df_saves = pd.read_excel(SAVES_FILE)
+    df_saves.loc[df_saves["username"] == username, ["team_name", "budget", "points", "played", "goal_difference"]] = [
+        state["team_name"], state["budget"], state["points"], state["played"], state["goal_difference"]
+    ]
+    df_saves.to_excel(SAVES_FILE, index=False)

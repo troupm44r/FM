@@ -1,13 +1,14 @@
 import streamlit as st
-from database import init_db, register_user, verify_user, load_game_state, save_game_state
+import pandas as pd
+import os
+from database import init_db, register_user, verify_user, load_game_state, save_game_state, USERS_FILE, SAVES_FILE, LEAGUES_FILE, TEAMS_FILE, PLAYERS_FILE
 from game_logic import simulate_match, get_transfer_market
 
-# Initialisation de la base de données
+# Initialisation de la base de données (dossier data et fichiers excel)
 init_db()
 
 st.set_page_config(page_title="Mini Football Manager", page_icon="⚽", layout="wide")
 
-# Gestion de la session utilisateur
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
@@ -49,11 +50,10 @@ if not st.session_state.logged_in:
             else:
                 st.warning("Veuillez remplir tous les champs.")
 
-# --- APPLICATION PRINCIPALE (SI CONNECTÉ) ---
+# --- APPLICATION PRINCIPALE ---
 else:
     state = st.session_state.game_state
     
-    # Barre latérale (Sidebar) - Infos manager & Déconnexion
     with st.sidebar:
         st.write(f"👤 **Manager :** {st.session_state.username}")
         st.text_input("Nom de l'équipe", value=state["team_name"], key="input_team_name")
@@ -70,18 +70,40 @@ else:
         st.markdown("---")
         if st.button("💾 Sauvegarder la partie"):
             save_game_state(st.session_state.username, state)
-            st.success("Partie sauvegardée dans le Cloud !")
+            st.success("Partie sauvegardée dans le fichier Excel !")
             
+        st.markdown("---")
+        
+        # Panneau Administrateur Excel
+        with st.expander("🛠️ Mode Administrateur (Excel)"):
+            admin_pass = st.text_input("Mot de passe admin", type="password", key="admin_pwd")
+            if admin_pass == "mon_super_secret_admin":
+                st.success("Accès admin autorisé")
+                df_users = pd.read_excel(USERS_FILE)
+                df_saves = pd.read_excel(SAVES_FILE)
+                
+                st.write("**users.xlsx**")
+                st.dataframe(df_users)
+                st.write("**saves.xlsx**")
+                st.dataframe(df_saves)
+            elif admin_pass:
+                st.error("Mot de passe incorrect")
+
+        st.markdown("---")
         if st.button("Déconnexion"):
             st.session_state.logged_in = False
             st.session_state.username = ""
             st.session_state.game_state = None
             st.rerun()
 
-    # Contenu principal - Onglets du jeu
     st.title(f"🏟️ Tableau de Bord - {state['team_name']}")
     
-    tab_match, tab_transferts, tab_classement = st.tabs(["📅 Jouer un Match", "🛒 Marché des Transferts", "🏆 Classement & Stats"])
+    tab_match, tab_transferts, tab_classement, tab_explorateur = st.tabs([
+        "📅 Jouer un Match", 
+        "🛒 Marché des Transferts", 
+        "🏆 Classement & Stats", 
+        "🌍 Explorateur d'Équipes"
+    ])
     
     with tab_match:
         st.subheader("Prochaine journée de championnat")
@@ -92,7 +114,6 @@ else:
             state["played"] += 1
             state["points"] += pts
             state["goal_difference"] += gd
-            # Sauvegarde automatique après chaque match
             save_game_state(st.session_state.username, state)
             
             st.markdown(f"### Résultat :")
@@ -123,3 +144,28 @@ else:
         st.write(f"- **Matchs joués :** {state['played']}")
         st.write(f"- **Points :** {state['points']}")
         st.write(f"- **Différence de buts :** {state['goal_difference']}")
+
+    with tab_explorateur:
+        st.subheader("🌍 Explorer les championnats et effectifs mondiaux (via Excel)")
+        st.write("Visualisez n'importe quelle équipe et ses joueurs stockés dans les fichiers Excel.")
+        
+        # Chargement des données depuis les fichiers Excel du dossier data/
+        df_leagues = pd.read_excel(LEAGUES_FILE)
+        df_teams = pd.read_excel(TEAMS_FILE)
+        df_players = pd.read_excel(PLAYERS_FILE)
+        
+        ligue_choisie = st.selectbox("Choisir une ligue", df_leagues['name'].tolist(), key="select_league")
+        
+        if ligue_choisie:
+            ligue_id = df_leagues[df_leagues['name'] == ligue_choisie]['id'].values[0]
+            equipes_filt = df_teams[df_teams['league_id'] == ligue_id]
+            
+            equipe_choisie = st.selectbox("Choisir une équipe", equipes_filt['name'].tolist(), key="select_team")
+            
+            if equipe_choisie:
+                equipe_id = equipes_filt[equipes_filt['name'] == equipe_choisie]['id'].values[0]
+                joueurs_filt = df_players[df_players['team_id'] == equipe_id][['name', 'position', 'rating']]
+                joueurs_filt.columns = ["Joueur", "Poste", "Note"]
+                
+                st.markdown(f"### Effectif de {equipe_choisie}")
+                st.dataframe(joueurs_filt, use_container_width=True)
