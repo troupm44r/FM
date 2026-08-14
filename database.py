@@ -1,9 +1,11 @@
 import sqlite3
 import hashlib
+import os
 
 DB_NAME = "football_manager.db"
 
 def init_db():
+    # Vérifie si la base existe, sinon elle est créée dans le dossier du projet
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     
@@ -15,7 +17,7 @@ def init_db():
         )
     ''')
     
-    # Table des sauvegardes de parties (état du jeu par utilisateur)
+    # Table des sauvegardes de parties
     c.execute('''
         CREATE TABLE IF NOT EXISTS saves (
             username TEXT PRIMARY KEY,
@@ -39,7 +41,6 @@ def register_user(username, password):
     try:
         c.execute("INSERT INTO users (username, password) VALUES (?, ?)", 
                   (username, hash_password(password)))
-        # Initialiser une partie par défaut
         c.execute("INSERT INTO saves (username, team_name, budget, points, played, goal_difference) VALUES (?, ?, ?, ?, ?, ?)",
                   (username, f"FC {username}", 50000000, 0, 0, 0))
         conn.commit()
